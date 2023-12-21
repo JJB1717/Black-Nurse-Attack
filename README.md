@@ -1,12 +1,60 @@
 # Black-Nurse-Attack
-Traditional ICMP flooding attack floods target hosts with massive echo request packets [Type 8, Code 0]. In contrast, TDC Security Operations Center has discovered in 2016 another type of ICMP based attack known as Black-Nurse attack that explicitly targets firewalls and routers.
+# Black Nurse DOS POC
 
-The BlackNurse attack is considered as a special type of ICMP attack that depends on sending low volume traffic of specific ICMP error messages [Type: 3 (Destination unreachable), Code: 3 (Port unreachable)]. This low volume DDoS attack is effective because the objective is not to flood the firewall with illegitimate traffic, but rather to craft packets that consume firewall resources and drive high CPU workload. Usually, firewalls with single CPU are more likely to be vulnerable to this attack than firewalls with multicore.
+Blacknurse is a low bandwidth ICMP attack that is capable of doing denial of service to well known firewalls. Most ICMP attacks that we see are based on ICMP Type 8 Code 0 also called a ping flood attack. BlackNurse is based on ICMP with Type 3 Code 3 packets. We know that when a user has allowed ICMP Type 3 Code 3 to outside interfaces, the BlackNurse attack becomes highly effective even at low bandwidth. Low bandwidth is in this case around 15-18 Mbit/s. This is to achieve the volume of packets needed which is around 40 to 50K packets per second. It does not matter if you have a 1 Gbit/s Internet connection. The impact we see on different firewalls is typically high CPU loads. When an attack is ongoing, users from the LAN side will no longer be able to send/receive traffic to/from the Internet. All firewalls we have seen recover when the attack stops.
 
-Practically, to generate the BlackNurse attack as illustrated in, any network packet generator tool can be used. For example, the following Hping3 tool’s online commands allow to generate the attack:
-# hping3 -1 –C 3 –K 3 –i u20 dest-ip.
-This command sends ICMP port unreachable message [Type: 3, Code: 3] to the target dest-ip, where –i u20 sends one packet every 20 ms.
-# hping3 -1 –C 3 –K 3 –flood dest-ip
-While this command floods the target dest-ip with ICMP port unreachable message [Type: 3, Code: 3].
+### Vulnerable systems
 
-Experiments are conducted to generate the BlackNurse attack using only 7K packets per second and show its impact on commercial grades, Juniper NetScreen SSG 20, and Cisco ASA 5540 firewalls.
+
+ * Cisco ASA 5505, 5506, 5515, 5525 , 5540 (default settings)
+ * Cisco 6500 routers with SUP2T and Netflow v9 on the inbound interface - 100% CPU load
+ * Cisco ASA 5550 (Legacy) and 5515-X (latest generation)
+ * Cisco Router 897 - Can be mitigated - The current code from https://www.cymru.com/Documents/secure-ios-template.html will make evil worse.
+ * SonicWall - Misconfiguration can be changed and mitigated (Enable Anti-DDOS)
+ * Palo Alto 5050 Firewalls with firmware 7.1.4-h2 
+ * Zyxel NWA3560-N (Wireless attack from LAN Side)
+ * Zyxel Zywall USG50
+ * Fortinet v5.4.1 - One CPU consumed
+ * Fortigate units 60c and 100D (even with drop ICMP on)
+
+### Tested not vulnerable
+
+ * Iptables (Netfilter even with 480 Mbit/sec)
+ * mikrotik CCR1036-12G-4S firmware: 3.27 (250 Mbit/sec) and no problem && RouterOS 5.4 on Mikrotik RB750
+ * OpenBSD 6.0 and current
+ * Windows Firewalls
+ * pfSense
+ * GigaVUE HC-Serie (Gigamon)
+ * AVM Fritz!Box 7360 (common ADSl router in Germany)
+ * Ubiquiti Networks - EdgeRouter Lite CPU 60-70% load but still going
+ * Cisco ISR4321 Router IOS XE - Version 15.5(3)S2, RELEASE SOFTWARE (fc2)
+ * Check Point Security Gateways
+ * Juniper SRX
+
+## Mitigation
+
+### Cisco ASA 5550 (Legacy) and 5515-X (latest generation) 
+
+To mitigate this attack on Cisco routers the following commands can help
+
+    icmp deny any unreachable outside
+    icmp deny any time outside
+
+## C compilation
+
+    gcc exploit.c -o blacknurse
+    ./blacknurse <target ip>
+
+## Python Dependencies
+
+ * Python 2.6 or 2.7
+ * Scapy
+ * argparse (included with Python >= 2.7 and >= 3.2)
+
+### Scapy installation on Debian 
+
+    apt-get install python-scapy
+
+### Scapy installation with pip
+
+    pip install scapy
